@@ -15,6 +15,7 @@ from pr_agent.algo.comment_identity import (
     PRCodeSuggestionsHeader,
     PRCodeSuggestionsIdentity,
     add_comment_identity,
+    comment_authorship_available,
     comment_matches_identity,
     format_pr_code_suggestions_header,
     hidden_marker_forms,
@@ -807,14 +808,7 @@ class PRCodeSuggestions:
             if git_provider._publish_check_run(pr_comment, name):
                 return progress_response if _clean_up_progress_note() else None
 
-        try:
-            require_agent_authorship = (
-                git_provider.supports_review_finding_state() is True
-                and git_provider.is_supported("get_issue_comments") is True
-            )
-        except Exception as error:
-            get_logger().warning(f"Suggestions comment authorship is not available, error: {error}")
-            require_agent_authorship = False
+        require_agent_authorship = comment_authorship_available(git_provider)
 
         if _supports_code_suggestion_state(git_provider) and max_previous_comments <= 0:
             result = GitProvider.publish_persistent_comment_full(

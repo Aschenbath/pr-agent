@@ -13,6 +13,7 @@ from pr_agent.algo.comment_identity import (
     PRReviewHeader,
     PRReviewIdentity,
     add_pr_review_identity,
+    comment_authorship_available,
     get_pr_review_comment_identifiers,
     hidden_marker_forms,
     render_hidden_marker,
@@ -639,19 +640,7 @@ class PRReviewer:
             return None
 
     def _review_comment_authorship_available(self) -> bool:
-        provider = getattr(self, "git_provider", None)
-        if provider is None:
-            return False
-        try:
-            return (
-                provider.supports_review_finding_state() is True
-                and provider.is_supported("get_issue_comments") is True
-            )
-        except Exception as error:
-            get_logger().warning(
-                f"Review comment authorship is not available, error: {error}"
-            )
-            return False
+        return comment_authorship_available(getattr(self, "git_provider", None))
 
     def _load_review_finding_state(self):
         identifiers = get_pr_review_comment_identifiers(full=True, incremental=False)
