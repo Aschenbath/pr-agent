@@ -20,6 +20,10 @@ from .git_provider import GitProvider, cache_languages, get_git_ssl_env
 
 
 class BitbucketServerProvider(GitProvider):
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "bitbucket_server",
+                "repo": f"{self.workspace_slug}/{self.repo_slug}", "number": self.pr_num}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         return policy_metadata(title=self.pr.title, sender=policy_value(self.pr, "author", "user", "name"),
                                repo_full_name=f"{self.workspace_slug}/{self.repo_slug}",

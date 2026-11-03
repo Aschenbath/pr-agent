@@ -33,6 +33,9 @@ class LocalGitProvider(GitProvider):
     file (review.md, description.md, improve.md) since there is no hosted PR to comment on.
     """
 
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "local"}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         # A local comparison has branches, but no hosted PR author or labels.
         return policy_metadata(title=self.pr.title, sender="", repo_full_name="",

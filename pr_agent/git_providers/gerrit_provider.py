@@ -11,6 +11,7 @@ import uuid
 from collections import namedtuple
 from pathlib import Path
 from tempfile import mkdtemp
+from urllib.parse import quote
 
 import requests
 import urllib3.util
@@ -280,6 +281,12 @@ def upload_patch(patch, path):
 
 
 class GerritProvider(GitProvider):
+
+    def get_pr_identity(self) -> dict:
+        number = int(self.refspec.split("/")[-2])
+        return {**super().get_pr_identity(), "provider": "gerrit", "repo": self.project,
+                "number": number, "url": f"{self.pr_url.rstrip('/')}/c/{quote(self.project, safe='/')}/+/{number}",
+                "head_sha": self.repo.head.commit.hexsha}
 
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         # The checkout provides no reliable source/target branch names or review labels.

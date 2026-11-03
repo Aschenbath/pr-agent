@@ -71,6 +71,10 @@ def _with_default_request_timeout(call_api):
 
 
 class GiteaProvider(GitProvider):
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "gitea",
+                "repo": f"{self.owner}/{self.repo}", "number": self.pr_number}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         pr = self.pr
         if pr is None:

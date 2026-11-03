@@ -187,6 +187,10 @@ def _get_azure_change_type(change):
 
 class AzureDevopsProvider(GitProvider):
 
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "azure",
+                "repo": f"{self.workspace_slug}/{self.repo_slug}", "number": self.pr_num}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         source = self.pr.source_ref_name
         target = self.pr.target_ref_name

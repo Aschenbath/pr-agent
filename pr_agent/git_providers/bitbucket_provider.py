@@ -174,6 +174,10 @@ def _diffstat_line_count(diff, field: str) -> int | None:
 
 
 class BitbucketProvider(GitProvider):
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "bitbucket",
+                "repo": f"{self.workspace_slug}/{self.repo_slug}", "number": self.pr_num}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         pr = self.pr.data
         return policy_metadata(title=policy_value(pr, "title"),

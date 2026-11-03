@@ -1359,6 +1359,22 @@ class GitProvider(ABC):
         """
         return ""
 
+    def get_pr_identity(self) -> dict:
+        """Return output identity from the provider's current snapshot, without refreshing it.
+
+        Providers override the provider name, repository and PR number using their own cached
+        metadata. Unknown fields stay null, including for local and plain-diff runs.
+        """
+        identity = dict.fromkeys(("url", "provider", "repo", "number", "head_sha"))
+        for key, reader in (("url", self.get_pr_url), ("head_sha", self.get_pr_head_sha)):
+            try:
+                value = reader()
+                if isinstance(value, str) and value:
+                    identity[key] = value
+            except Exception as e:
+                get_logger().warning(f"Output PR {key} unavailable: {type(e).__name__}")
+        return identity
+
     def auto_approve(self) -> bool:
         return False
 

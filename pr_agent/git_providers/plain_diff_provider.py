@@ -30,6 +30,9 @@ class PlainDiffGitProvider(GitProvider):
     Treat the pr_url arg as an ignored sentinel.
     """
 
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "plain-diff"}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         # A supplied patch has no PR metadata; its display title is not a PR title.
         return policy_metadata(title=None, sender="", repo_full_name="",

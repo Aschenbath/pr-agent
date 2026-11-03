@@ -629,7 +629,7 @@ class TestPushOutputs:
         push_outputs("review", payload={"message": "שלום 👋"}, markdown="**review**")
 
         record = json.loads(out.read_text(encoding='utf-8'))
-        assert set(record) == {"type", "timestamp", "payload", "markdown"}
+        assert set(record) == {"type", "timestamp", "payload", "markdown", "pr"}
         assert posts == [
             ('https://example.test/webhook', record),
             ('https://example.test/slack', {"text": "**review**"}),

@@ -66,15 +66,27 @@ class WebhookSink:
             _post_json("webhook", url, record)
 
 
+def _chat_output_text(record: dict, max_utf16_units: int | None = None) -> str:
+    text = record.get("markdown")
+    if text is None:
+        text = json.dumps(record["payload"], ensure_ascii=False)
+    pr_url = (record.get("pr") or {}).get("url")
+    suffix = f"\n\n{pr_url}" if pr_url else ""
+    if max_utf16_units is None:
+        return text + suffix
+    # Reserve room for the PR link before truncating the body; never split a surrogate pair.
+    suffix_bytes = suffix.encode("utf-16-le", "surrogatepass")[:max_utf16_units * 2]
+    suffix = suffix_bytes.decode("utf-16-le", "ignore")
+    body_bytes = text.encode("utf-16-le", "surrogatepass")[:max_utf16_units * 2 - len(suffix_bytes)]
+    return body_bytes.decode("utf-16-le", "ignore") + suffix
+
+
 class SlackSink:
     def send(self, record: dict, cfg: dict) -> None:
         url = _push_outputs_sink_url(cfg, "slack_webhook_url")
         if not url:
             return
-        text = record.get("markdown")
-        if text is None:
-            text = json.dumps(record["payload"], ensure_ascii=False)
-        _post_json("slack", url, {"text": text})
+        _post_json("slack", url, {"text": _chat_output_text(record)})
 
 
 class TelegramSink:
@@ -89,14 +101,9 @@ class TelegramSink:
             get_logger().warning(f"push_outputs: telegram channel missing {', '.join(missing_keys)}")
             return
 
-        text = record.get("markdown")
-        if text is None:
-            text = json.dumps(record["payload"], ensure_ascii=False)
         # Keep the host fixed and encode the token as a path component, not a URL.
         url = f"https://api.telegram.org/bot{quote(bot_token, safe=':')}/sendMessage"
-        # Limit to 4096 UTF-16 code units, dropping an incomplete surrogate pair at the boundary.
-        text = text.encode("utf-16-le", "surrogatepass")[:8192].decode("utf-16-le", "ignore")
-        _post_json("telegram", url, {"chat_id": chat_id, "text": text})
+        _post_json("telegram", url, {"chat_id": chat_id, "text": _chat_output_text(record, 4096)})
 
 
 # Keep local channels before network channels, regardless of configuration order.

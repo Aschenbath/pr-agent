@@ -4,7 +4,8 @@ sidebar_position: 7
 ---
 
 The `[push_outputs]` feature routes finished tool output to external sinks — stdout, a JSONL file, a
-generic webhook, Slack, or Telegram — without calling git-provider APIs. It is disabled by default, and is
+generic webhook, Slack, or Telegram. It reads PR identity from the tool's existing provider snapshot,
+without refreshing the PR or publishing extra comments. It is disabled by default, and is
 additive to normal publishing: when a tool finishes, the same result that is posted as a PR comment
 is also emitted to the configured sinks.
 
@@ -24,6 +25,13 @@ A record is a JSON object:
 {
   "type": "review",
   "timestamp": "2026-09-08T14:03:21+00:00",
+  "pr": {
+    "url": "https://github.com/example/repo/pull/42",
+    "provider": "github",
+    "repo": "example/repo",
+    "number": 42,
+    "head_sha": "abc123"
+  },
   "payload": {},
   "markdown": "# PR Reviewer Guide ..."
 }
@@ -31,6 +39,10 @@ A record is a JSON object:
 
 - `type` — which tool produced the output
 - `timestamp` — the run completion time, UTC, ISO-8601
+- `pr` — the PR's URL, provider ID (such as `github`, `gitlab`, or `azure`), repository name,
+  number, and head commit SHA from the provider snapshot used by the tool. Unavailable fields
+  are `null`; local and plain-diff runs have no hosted PR. This additive object lets collectors
+  group outputs by PR and distinguish revisions without changing `payload` or `markdown`.
 - `payload` — the structured tool result
 - `markdown` — the rendered comment text; present when the tool produces one
 
@@ -90,8 +102,8 @@ credential.
 | `stdout` | Prints one JSON line (the record) to stdout. |
 | `file` | Appends one JSON line per run (JSONL) to `file_path`, creating parent directories as needed. |
 | `webhook` | POSTs the generic record as JSON to `webhook_url` (5-second timeout, redirects not followed). |
-| `slack` | POSTs `{"text": ...}` to a Slack Incoming Webhook; the text is the markdown, or the payload JSON when the tool produces no markdown. |
-| `telegram` | Sends the markdown, or the payload JSON when no markdown is present, as plain text to `telegram_chat_id`. Text is truncated to at most 4096 UTF-16 code units without splitting surrogate pairs. |
+| `slack` | POSTs `{"text": ...}` to a Slack Incoming Webhook; the text is the markdown, or the payload JSON when the tool produces no markdown, followed by the PR URL when available. |
+| `telegram` | Sends the markdown, or the payload JSON when no markdown is present, followed by the PR URL when available. Plain text is limited to 4096 UTF-16 code units without splitting surrogate pairs; room for the URL is reserved before truncating the body. |
 
 Local channels (`stdout`, `file`) run before network channels (`webhook`, `slack`, `telegram`), and network
 posts never follow redirects. Each configured destination is attempted independently, so one failure
@@ -134,6 +146,11 @@ still reaches the sink before the command returns. Delivery strategies live in
 `create_output_sink()` selects the strategy from `OUTPUT_SINK_TYPES`. Registry order
 determines delivery order, with local writes first; duplicate channel entries still result
 in a single delivery.
+
+Tools pass their `git_provider` to the delivery call. Providers expose `get_pr_identity()`
+using their already-loaded metadata; custom providers can override this hook to identify
+their PRs without fetching them again. Missing or failing identity hooks leave unknown fields
+`null` and do not prevent delivery. Calls that omit a provider remain supported.
 
 To add a destination, implement its strategy and register it, then add any required host-only
 settings, documentation, and provider-specific tests. HTTP strategies must validate destinations

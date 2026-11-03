@@ -282,6 +282,12 @@ _GITLAB_ACCESS_LEVEL_REPORTER = 20
 class GitLabProvider(GitProvider):
     reuse_for_manual_tool = True
 
+    def get_pr_identity(self) -> dict:
+        # Parse the canonical web URL, including when the input used a numeric project alias.
+        repo, number = self._parse_merge_request_url(self.mr.web_url)
+        return {**super().get_pr_identity(), "provider": "gitlab", "url": self.mr.web_url,
+                "repo": repo, "number": number}
+
     def get_request_policy_metadata(self, required_fields: set[str]) -> dict:
         return policy_metadata(title=self.mr.title, sender=policy_value(self.mr, "author", "username"),
                                repo_full_name=self._superproject_path(), source_branch=self.mr.source_branch,

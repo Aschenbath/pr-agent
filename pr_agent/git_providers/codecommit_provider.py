@@ -85,6 +85,10 @@ class CodeCommitProvider(GitProvider):
 
     max_comment_length = 10240 - len("...")
 
+    def get_pr_identity(self) -> dict:
+        return {**super().get_pr_identity(), "provider": "codecommit", "repo": self.repo_name,
+                "number": self.pr_num, "head_sha": self.pr.source_commit or None}
+
     def __init__(self, pr_url: str | None = None, incremental: bool | None = False):
         self.codecommit_client = CodeCommitClient()
         self.aws_client = None

@@ -153,6 +153,7 @@ async def test_improve_sends_readable_markdown(emitted, monkeypatch):
     assert emitted, "the improve publish path emitted nothing"
     _args, kwargs = emitted[0]
     assert kwargs["markdown"] is not None
+    assert kwargs["git_provider"] is tool.git_provider
     assert "src/foo.py:12-18" in kwargs["markdown"]
     assert "<table>" not in kwargs["markdown"]
 
@@ -222,6 +223,7 @@ async def test_improve_external_output_reports_no_suggestions_and_omitted_files(
     markdown = emitted[0][1]["markdown"]
     assert "No code suggestions found in the successfully analyzed chunks." in markdown
     assert "omitted.py" in markdown
+    assert emitted[0][1]["git_provider"] is tool.git_provider
 
 
 @pytest.mark.asyncio

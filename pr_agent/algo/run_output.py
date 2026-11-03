@@ -6,6 +6,7 @@ import os
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from importlib.metadata import PackageNotFoundError, version
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -31,8 +32,40 @@ def github_action_output(output_data: dict, key_name: str):
     return
 
 
-def push_outputs(message_type: str, payload: dict | None = None, markdown: str | None = None) -> None:
-    """Emit a tool's output to external sinks, without calling any git-provider API.
+def _output_pr_identity(git_provider) -> dict:
+    """Read optional provider identity without letting missing metadata discard an output."""
+    identity = dict.fromkeys(("url", "provider", "repo", "number", "head_sha"))
+    try:
+        getter = getattr(git_provider, "get_pr_identity", None)
+        values = getter() if callable(getter) else None
+        if not isinstance(values, dict):
+            return identity
+        for key in ("url", "provider", "repo", "head_sha"):
+            value = values.get(key)
+            if isinstance(value, str) and value.strip():
+                identity[key] = value
+        number = values.get("number")
+        if isinstance(number, str) and number.isascii() and number.isdigit():
+            number = int(number)
+        if isinstance(number, int) and not isinstance(number, bool) and number > 0:
+            identity["number"] = number
+        if identity["url"]:
+            try:
+                url = urlsplit(identity["url"])
+                valid_url = url.scheme in ("http", "https") and bool(url.hostname)
+            except ValueError:
+                valid_url = False
+            if not valid_url:
+                identity["url"] = None
+    except Exception as e:
+        get_logger().warning(f"push_outputs: PR identity unavailable: {type(e).__name__}")
+    return identity
+
+
+def push_outputs(
+    message_type: str, payload: dict | None = None, markdown: str | None = None, *, git_provider=None,
+) -> None:
+    """Emit a tool's output to external sinks without publishing to the git provider.
 
     Controlled by the [push_outputs] config section (disabled by default). Supported channels:
     "stdout" (one JSON line), "file" (append JSONL), "webhook" (POST the generic record),
@@ -53,6 +86,7 @@ def push_outputs(message_type: str, payload: dict | None = None, markdown: str |
             "type": message_type,
             "timestamp": datetime.now(UTC).isoformat(),
             "payload": payload or {},
+            "pr": _output_pr_identity(git_provider),
         }
         if markdown is not None:
             record["markdown"] = markdown
@@ -69,14 +103,16 @@ def push_outputs(message_type: str, payload: dict | None = None, markdown: str |
         get_logger().warning(f"push_outputs failed: {type(e).__name__}")
 
 
-async def push_outputs_async(message_type: str, payload: dict | None = None, markdown: str | None = None) -> None:
+async def push_outputs_async(
+    message_type: str, payload: dict | None = None, markdown: str | None = None, *, git_provider=None,
+) -> None:
     """Emit a tool's output to external sinks without blocking the event loop.
 
     The sinks do blocking HTTP and file I/O, so the delivery runs in a worker thread.
     Awaiting it keeps the event loop free for other work and still delivers the output
     before the command returns.
     """
-    await asyncio.to_thread(push_outputs, message_type, payload=payload, markdown=markdown)
+    await asyncio.to_thread(push_outputs, message_type, payload=payload, markdown=markdown, git_provider=git_provider)
 
 
 def _render_setting_value(value) -> str:
